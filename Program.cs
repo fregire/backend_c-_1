@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.Specialized;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -157,12 +155,96 @@ namespace Sockets
             }
         }
 
+        
+        private static string GetHeaderValue(Request request, string headerName)
+        {
+            return request
+                .Headers
+                .FirstOrDefault(h => h.Name == headerName)
+                ?.Value;
+        }
+        
         private static byte[] ProcessRequest(Request request)
         {
-            // TODO
-            var head = new StringBuilder("OK");
-            var body = new byte[0];
-            return CreateResponseBytes(head, body);
+            var mainUrl = request.RequestUri;
+            string urlParams = null;
+            if (request.RequestUri.Contains("?"))
+            {
+                var tmp = request.RequestUri.Split("?");
+                mainUrl = tmp[0];
+                urlParams = tmp[1];
+            }
+
+            if (mainUrl == "/" || mainUrl == "/hello.html")
+            {
+                var head = new StringBuilder("HTTP/1.1 200 OK\r\n");
+                head.Append("Content-Type: text/html; charset=utf-8\r\n");
+                var content = File.ReadAllText("hello.html");
+
+                if (!String.IsNullOrEmpty(urlParams))
+                {
+                    var queryParams = HttpUtility.ParseQueryString(urlParams);
+                    if (queryParams["name"] != null)
+                    {
+                        content = content.Replace(
+                            "{{World}}",
+                            HttpUtility.HtmlEncode(queryParams["name"]));
+                        head.Append("Set-Cookie: name=" + queryParams["name"] + "\r\n");
+                    }
+                    else
+                    {
+                        var value = GetHeaderValue(request, "Cookie");
+                        if (value != null)
+                            content = content.Replace(
+                                "{{World}}",
+                                HttpUtility.HtmlEncode(value.Split("=")[1]));
+                    }
+                    if (queryParams["greeting"] != null)
+                        content = content.Replace(
+                            "{{Hello}}",
+                            HttpUtility.HtmlEncode(queryParams["greeting"]));
+
+                }
+                else
+                {
+                    var value = GetHeaderValue(request, "Cookie");
+                    if (value != null)
+                        content = content.Replace(
+                            "{{World}}",
+                            HttpUtility.HtmlEncode(value.Split("=")[1]));
+                }
+                var body = Encoding.UTF8.GetBytes(content);
+                head.Append("Content-Length: " + body.Length + "\r\n\r\n");
+
+                return CreateResponseBytes(head, body);
+            }
+
+            if (mainUrl == "/groot.gif")
+            {
+                var body = File.ReadAllBytes("groot.gif");
+                var head = new StringBuilder("HTTP/1.1 200 OK\r\n");
+                head.Append("Content-Type: image/gif; charset=utf-8\r\n");
+                head.Append("Content-Length: " + body.Length + "\r\n\r\n");
+
+                return CreateResponseBytes(head, body);
+            }
+
+            if (mainUrl == "/time.html")
+            {
+                var content = File
+                    .ReadAllText("time.template.html")
+                    .Replace("{{ServerTime}}", DateTime.Now.ToString());
+                var body = Encoding.UTF8.GetBytes(content);
+                var head = new StringBuilder("HTTP/1.1 200 OK\r\n");
+                head.Append("Content-Type: text/html; charset=utf-8\r\n");
+                head.Append("Content-Length: " + body.Length + "\r\n\r\n");
+
+                return CreateResponseBytes(head, body);
+
+            }
+            return CreateResponseBytes(
+                new StringBuilder("HTTP/1.1 404 Not Found\r\n"), 
+                new byte[0]);
         }
 
         // Собирает ответ в виде массива байт из байтов строки head и байтов body.
