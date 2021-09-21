@@ -180,6 +180,7 @@ namespace Sockets
                 var head = new StringBuilder("HTTP/1.1 200 OK\r\n");
                 head.Append("Content-Type: text/html; charset=utf-8\r\n");
                 var content = File.ReadAllText("hello.html");
+                var setNameFromCookie = false;
 
                 if (!String.IsNullOrEmpty(urlParams))
                 {
@@ -192,20 +193,17 @@ namespace Sockets
                         head.Append("Set-Cookie: name=" + queryParams["name"] + "\r\n");
                     }
                     else
-                    {
-                        var value = GetHeaderValue(request, "Cookie");
-                        if (value != null)
-                            content = content.Replace(
-                                "{{World}}",
-                                HttpUtility.HtmlEncode(value.Split("=")[1]));
-                    }
+                        setNameFromCookie = true;
+
                     if (queryParams["greeting"] != null)
                         content = content.Replace(
                             "{{Hello}}",
                             HttpUtility.HtmlEncode(queryParams["greeting"]));
-
                 }
                 else
+                    setNameFromCookie = true;
+
+                if (setNameFromCookie)
                 {
                     var value = GetHeaderValue(request, "Cookie");
                     if (value != null)
@@ -213,6 +211,7 @@ namespace Sockets
                             "{{World}}",
                             HttpUtility.HtmlEncode(value.Split("=")[1]));
                 }
+                
                 var body = Encoding.UTF8.GetBytes(content);
                 head.Append("Content-Length: " + body.Length + "\r\n\r\n");
 
